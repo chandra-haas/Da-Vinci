@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Modern Chat UI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f0f2f5;
+    }
+
+    .chat-wrapper {
+      max-width: 800px;
+      height: 90vh;
+      margin: 20px auto;
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background-color: #007bff;
+      color: #fff;
+      padding: 20px;
+      font-size: 20px;
+      font-weight: bold;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .chat-body {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background-color: #e5ddd5;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      max-width: 70%;
+      padding: 14px 18px;
+      border-radius: 20px;
+      font-size: 15px;
+      line-height: 1.5;
+      word-wrap: break-word;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    .sent {
+      align-self: flex-end;
+      background-color: #dcf8c6;
+    }
+
+    .received {
+      align-self: flex-start;
+      background-color: #fff;
+    }
+
+    .chat-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 15px;
+      background-color: #f7f7f7;
+      border-top: 1px solid #ddd;
+      box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .chat-footer input[type="text"] {
+      flex: 1;
+      padding: 12px 18px;
+      border: 1px solid #ccc;
+      border-radius: 25px;
+      font-size: 14px;
+      outline: none;
+      background-color: #fff;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background-color: #e0e0e0;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      transition: background 0.2s ease;
+    }
+
+    .icon-button:hover {
+      background-color: #ccc;
+    }
+
+    .send-button {
+      background-color: #007bff;
+      color: #fff;
+      font-size: 22px;
+    }
+
+    .send-button:hover {
+      background-color: #0056b3;
+    }
+
+    #recording-indicator {
+      display: none;
+      color: red;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+
+    .chat-body::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chat-body::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-wrapper">
+    <div class="chat-header">Assistant Chat</div>
+    <div class="chat-body">
+      <div class="message received">Hi there! 👋</div>
+      <div class="message sent">Hey! I’m here to help.</div>
+      <div class="message received">Please enhance the UI!</div>
+    </div>
+    <div class="chat-footer">
+      <!-- Misc Options Button -->
+      <button class="icon-button" title="Options">⋮</button>
+
+      <!-- Input -->
+      <input type="text" placeholder="Type a message...">
+
+      <!-- Mic Button -->
+      <button class="icon-button" title="Voice Mode" id="mic-button">🎙️</button>
+      <span id="recording-indicator">● Recording...</span>
+
+      <!-- Send Button -->
+      <button class="icon-button send-button" title="Send">↩️</button>
+    </div>
+  </div>
+
+  <script>
+    // Chat Logic
+    const input = document.querySelector('input[type="text"]');
+    const chatBody = document.querySelector('.chat-body');
+    const sendButton = document.querySelector('.send-button');
+
+    function appendMessage(text, className) {
+      const msg = document.createElement('div');
+      msg.className = `message ${className}`;
+      msg.textContent = text;
+      chatBody.appendChild(msg);
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function sendMessage() {
+      const userMsg = input.value.trim();
+      if (!userMsg) return;
+
+      appendMessage(userMsg, 'sent');
+      input.value = '';
+
+      fetch('/api/chat/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ message: userMsg })
+      })
+      .then(res => res.json())
+      .then(data => {
+        appendMessage(data.response, 'received');
+      })
+      .catch(err => {
+        appendMessage("⚠️ Failed to reach AI", 'received');
+        console.error(err);
+      });
+    }
+
+    sendButton.addEventListener('click', sendMessage);
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // Microphone Logic
+    const micButton = document.getElementById('mic-button');
+    const recordingIndicator = document.getElementById('recording-indicator');
+
+    let mediaRecorder;
+    let isRecording = false;
+
+    micButton.addEventListener('click', async () => {
+      if (isRecording) {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordingIndicator.style.display = 'none';
+        micButton.style.backgroundColor = '#e0e0e0';
+      } else {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          
+          mediaRecorder.start();
+          isRecording = true;
+          recordingIndicator.style.display = 'inline';
+          micButton.style.backgroundColor = '#ff4b4b';
+
+          mediaRecorder.ondataavailable = e => {
+            console.log("Audio data available:", e.data);
+          };
+
+          mediaRecorder.onstop = () => {
+            console.log("Recording stopped.");
+            stream.getTracks().forEach(track => track.stop());
+          };
+        } catch (err) {
+          alert('Microphone access denied or not available.');
+          console.error(err);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
