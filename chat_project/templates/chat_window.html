@@ -5,7 +5,7 @@
   <title>Modern Chat UI</title>
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI&display=swap" rel="stylesheet">
   <style>
-    * {
+     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
@@ -136,108 +136,117 @@
 <body>
   <div class="chat-wrapper">
     <div class="chat-header">Assistant Chat</div>
-    <div class="chat-body">
+    <div class="chat-body" id="chat-box">
       <div class="message received">Hi there! 👋</div>
       <div class="message sent">Hey! I’m here to help.</div>
       <div class="message received">Please enhance the UI!</div>
     </div>
     <div class="chat-footer">
-      <!-- Misc Options Button -->
       <button class="icon-button" title="Options">⋮</button>
-
-      <!-- Input -->
-      <input type="text" placeholder="Type a message...">
-
-      <!-- Mic Button -->
+      <input type="text" id="message-input" placeholder="Type a message...">
       <button class="icon-button" title="Voice Mode" id="mic-button">🎙️</button>
-      <span id="recording-indicator">● Recording...</span>
-
-      <!-- Send Button -->
+      <span id="recording-indicator">● Listening...</span>
       <button class="icon-button send-button" title="Send">↩️</button>
     </div>
   </div>
 
   <script>
-    // Chat Logic
-    const input = document.querySelector('input[type="text"]');
-    const chatBody = document.querySelector('.chat-body');
-    const sendButton = document.querySelector('.send-button');
+  const input = document.querySelector('input[type="text"]');
+  const chatBody = document.querySelector('.chat-body');
+  const sendButton = document.querySelector('.send-button');
+  const micButton = document.getElementById('mic-button');
+  const recordingIndicator = document.getElementById('recording-indicator');
 
-    function appendMessage(text, className) {
-      const msg = document.createElement('div');
-      msg.className = `message ${className}`;
-      msg.textContent = text;
-      chatBody.appendChild(msg);
-      chatBody.scrollTop = chatBody.scrollHeight;
-    }
+  let isVoiceInput = false;
 
-    function sendMessage() {
-      const userMsg = input.value.trim();
-      if (!userMsg) return;
+  function appendMessage(text, className) {
+    const msg = document.createElement('div');
+    msg.className = `message ${className}`;
+    msg.textContent = text;
+    chatBody.appendChild(msg);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
 
-      appendMessage(userMsg, 'sent');
-      input.value = '';
+  function speak(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    speechSynthesis.speak(utterance);
+  }
 
-      fetch('/api/chat/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify({ message: userMsg })
-      })
-      .then(res => res.json())
-      .then(data => {
-        appendMessage(data.response, 'received');
-      })
-      .catch(err => {
-        appendMessage("⚠️ Failed to reach AI", 'received');
-        console.error(err);
-      });
-    }
+  function sendMessage() {
+    const userMsg = input.value.trim();
+    if (!userMsg) return;
 
-    sendButton.addEventListener('click', sendMessage);
-    input.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage();
-    });
+    appendMessage(userMsg, 'sent');
+    input.value = '';
 
-    // Microphone Logic
-    const micButton = document.getElementById('mic-button');
-    const recordingIndicator = document.getElementById('recording-indicator');
-
-    let mediaRecorder;
-    let isRecording = false;
-
-    micButton.addEventListener('click', async () => {
-      if (isRecording) {
-        mediaRecorder.stop();
-        isRecording = false;
-        recordingIndicator.style.display = 'none';
-        micButton.style.backgroundColor = '#e0e0e0';
-      } else {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          mediaRecorder = new MediaRecorder(stream);
-          
-          mediaRecorder.start();
-          isRecording = true;
-          recordingIndicator.style.display = 'inline';
-          micButton.style.backgroundColor = '#ff4b4b';
-
-          mediaRecorder.ondataavailable = e => {
-            console.log("Audio data available:", e.data);
-          };
-
-          mediaRecorder.onstop = () => {
-            console.log("Recording stopped.");
-            stream.getTracks().forEach(track => track.stop());
-          };
-        } catch (err) {
-          alert('Microphone access denied or not available.');
-          console.error(err);
-        }
+    fetch('/api/chat/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ message: userMsg })
+    })
+    .then(res => res.json())
+    .then(data => {
+      appendMessage(data.response, 'received');
+      if (isVoiceInput) {
+        speak(data.response);
       }
+      isVoiceInput = false; // reset after reply
+    })
+    .catch(err => {
+      appendMessage("⚠️ Failed to reach AI", 'received');
+      console.error(err);
     });
-  </script>
+  }
+
+  sendButton.addEventListener('click', () => {
+    isVoiceInput = false;
+    sendMessage();
+  });
+
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      isVoiceInput = false;
+      sendMessage();
+    }
+  });
+
+  micButton.addEventListener('click', () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition not supported in this browser.');
+      return;
+    }
+
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.start();
+    recordingIndicator.style.display = 'inline';
+    micButton.style.backgroundColor = '#ff4b4b';
+
+    recognition.onresult = function(event) {
+      const transcript = event.results[0][0].transcript;
+      input.value = transcript;
+      isVoiceInput = true;
+      sendMessage();
+    };
+
+    recognition.onerror = function(event) {
+      console.error("Speech recognition error", event);
+      recordingIndicator.style.display = 'none';
+      micButton.style.backgroundColor = '#e0e0e0';
+    };
+
+    recognition.onend = function() {
+      recordingIndicator.style.display = 'none';
+      micButton.style.backgroundColor = '#e0e0e0';
+    };
+  });
+</script>
 </body>
 </html>
