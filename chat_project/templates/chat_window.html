@@ -519,6 +519,26 @@
       micButton.style.backgroundColor = '#e0e0e0';
     };
   });
+  // --- History Panel Logic ---
+    const historyOpenBtn = document.getElementById('historyOpenBtn');
+    const historyCloseBtn = document.getElementById('historyCloseBtn');
+    const historyColumn = document.getElementById('historyColumn');
+    const chatContainerMain = document.getElementById('chatContainerMain');
+    historyOpenBtn.addEventListener('click', function() {
+      historyColumn.classList.add('open');
+      chatContainerMain.classList.add('history-open');
+    });
+    historyCloseBtn.addEventListener('click', function() {
+      historyColumn.classList.remove('open');
+      chatContainerMain.classList.remove('history-open');
+    });
+
+    // --- Theme Switcher Logic ---
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    themeToggleBtn.addEventListener('click', function() {
+      document.body.classList.toggle('theme-red');
+    });
 </script>
+
 </body>
 </html>
