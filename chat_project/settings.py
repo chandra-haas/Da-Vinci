@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-854saw7fsgef5o3j999+0ymbj!bi8^nw=(%fs+*njm@xs1_!=$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1']
 
 
 # Application definition
@@ -125,3 +125,4 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 OPENAI_API_KEY = config('OPENAI_API_KEY')
+BRAVE_API_KEY = config('BRAVE_API_KEY')
