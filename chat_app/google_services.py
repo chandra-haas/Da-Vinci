@@ -7,7 +7,6 @@ import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-
 # Scopes required for Google services
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -17,14 +16,12 @@ SCOPES = [
     'https://www.googleapis.com/auth/calendar',
 ]
 
-
 # -------------------------------
 # AUTHENTICATION UTILITIES
 # -------------------------------
 
 class MissingCredentials(Exception):
     pass
-
 
 def get_auth_flow():
     return Flow.from_client_config(
@@ -40,12 +37,10 @@ def get_auth_flow():
         redirect_uri=settings.GOOGLE_REDIRECT_URI,
     )
 
-
 def build_credentials_from_code(code):
     flow = get_auth_flow()
     flow.fetch_token(code=code)
     return flow.credentials
-
 
 def build_credentials_from_session(session):
     creds_data = session.get('google_credentials')
@@ -53,13 +48,11 @@ def build_credentials_from_session(session):
         raise MissingCredentials("No credentials found in session.")
     return Credentials(**creds_data)
 
-
 def get_user_credentials(session):
     try:
         return build_credentials_from_session(session)
     except MissingCredentials as e:
         raise e
-
 
 # -------------------------------
 # GMAIL
@@ -68,7 +61,6 @@ def get_user_credentials(session):
 def get_gmail_messages(creds, max_results=5):
     service = build('gmail', 'v1', credentials=creds)
     return service.users().messages().list(userId='me', maxResults=max_results).execute()
-
 
 def send_gmail_message(creds, to_email, subject, body):
     footer = '<br><br><span style="color: #999999; font-size: 7pt;">Sent from <strong>Da_Vinci</strong></span>'
@@ -85,25 +77,31 @@ def send_gmail_message(creds, to_email, subject, body):
     service = build('gmail', 'v1', credentials=creds)
     return service.users().messages().send(userId='me', body={'raw': raw}).execute()
 
-
-
 # -------------------------------
 # GOOGLE DRIVE
 # -------------------------------
 
-def get_drive_files(creds):
+def get_drive_files(creds, page_size=10):
     service = build('drive', 'v3', credentials=creds)
-    return service.files().list(pageSize=10).execute()
-
+    return service.files().list(pageSize=page_size).execute()
 
 # -------------------------------
 # GOOGLE TASKS
 # -------------------------------
 
-def get_tasks(creds):
+def get_tasks(creds, max_results=10):
     service = build('tasks', 'v1', credentials=creds)
-    return service.tasklists().list(maxResults=10).execute()
+    return service.tasklists().list(maxResults=max_results).execute()
 
+def get_all_tasks(creds, max_results=10):
+    service = build('tasks', 'v1', credentials=creds)
+    tasklists = service.tasklists().list(maxResults=1).execute()
+    if not tasklists.get('items'):
+        return []
+
+    tasklist_id = tasklists['items'][0]['id']
+    tasks = service.tasks().list(tasklist=tasklist_id, maxResults=max_results).execute()
+    return tasks.get('items', [])
 
 def add_google_task(creds, task_title, task_notes=None, due_date=None, tasklist_id=None):
     service = build('tasks', 'v1', credentials=creds)
@@ -121,17 +119,23 @@ def add_google_task(creds, task_title, task_notes=None, due_date=None, tasklist_
 
     return service.tasks().insert(tasklist=tasklist_id, body=task_body).execute()
 
-
 # -------------------------------
 # GOOGLE CALENDAR
 # -------------------------------
 
-def get_calendar_events(creds):
+def get_calendar_events(creds, max_results=10):
     service = build('calendar', 'v3', credentials=creds)
-    return service.events().list(calendarId='primary', maxResults=10).execute()
+    return service.events().list(calendarId='primary', maxResults=max_results).execute()
 
-
-def create_calendar_event(creds, summary, start_time, end_time, description=None, location=None, add_meet=False):
+def create_calendar_event(
+    creds,
+    summary,
+    start_time,
+    end_time,
+    description=None,
+    location=None,
+    add_meet=False
+):
     service = build('calendar', 'v3', credentials=creds)
 
     event = {
@@ -139,7 +143,6 @@ def create_calendar_event(creds, summary, start_time, end_time, description=None
         'start': {'dateTime': start_time, 'timeZone': 'UTC'},
         'end': {'dateTime': end_time, 'timeZone': 'UTC'},
     }
-
     if description:
         event['description'] = description
     if location:
@@ -155,5 +158,5 @@ def create_calendar_event(creds, summary, start_time, end_time, description=None
     return service.events().insert(
         calendarId='primary',
         body=event,
-        conferenceDataVersion=1
+        conferenceDataVersion=1 if add_meet else 0
     ).execute()
