@@ -127,3 +127,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET')
+GOOGLE_REDIRECT_URI= 'http://127.0.0.1:8000/auth/google/callback/'

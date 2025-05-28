@@ -462,16 +462,19 @@
     })
     .then(res => res.json())
     .then(data => {
-      appendMessage(data.response, 'received');
-      if (isVoiceInput) {
-        speak(data.response);
-      }
-      isVoiceInput = false; // reset after reply
-    })
-    .catch(err => {
-      appendMessage("⚠️ Failed to reach AI", 'received');
-      console.error(err);
-    });
+  if (data.auth_required) {
+    appendMessage("🔐 Redirecting you to Google login...", "received");
+    window.location.href = "/auth/google/login/";
+    return;
+  }
+
+  appendMessage(data.response, 'received');
+  if (isVoiceInput) {
+    speak(data.response);
+  }
+  isVoiceInput = false;
+})
+
   }
 
   sendButton.addEventListener('click', () => {
