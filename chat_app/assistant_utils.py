@@ -2,6 +2,8 @@ import re
 from datetime import datetime
 import dateparser
 
+from .models import MemoryFact, ChatSession  # Import MemoryFact for semantic memory
+
 def gpt_param_extractor(user_input, required_fields):
     extracted = {}
     for field in required_fields:
@@ -51,6 +53,61 @@ def gpt_param_extractor(user_input, required_fields):
                 extracted[field] = False
 
     return extracted
+
+def extract_facts(user_message):
+    """
+    Extracts simple facts from the user message for semantic memory.
+    Expand this with more patterns as needed.
+    """
+    patterns = [
+        (r"\bmy name is ([\w\s]+)", "name"),
+        (r"\bi live in ([\w\s]+)", "location"),
+        (r"\bmy favourite color is ([\w\s]+)", "favorite_color"),
+        (r"\bmy favorite color is ([\w\s]+)", "favorite_color"),
+        (r"\bmy birthday is ([\w\d\s,]+)", "birthday"),
+        (r"\bmy age is (\d+)", "age"),
+        # Add more patterns as needed
+    ]
+    facts = []
+    for pattern, key in patterns:
+        match = re.search(pattern, user_message, re.IGNORECASE)
+        if match:
+            facts.append((key, match.group(1).strip()))
+    return facts
+
+def save_facts(chat_session, facts):
+    """
+    Save extracted facts to the MemoryFact model, updating if the key exists.
+    """
+    for key, value in facts:
+        MemoryFact.objects.update_or_create(
+            chat_session=chat_session,
+            key=key,
+            defaults={'value': value}
+        )
+
+def recall_fact(chat_session, user_message):
+    """
+    Check if the user is asking about a stored fact and retrieve it from memory.
+    """
+    key_map = {
+        "what is my name": "name",
+        "who am i": "name",
+        "where do i live": "location",
+        "what is my favorite color": "favorite_color",
+        "what is my favourite color": "favorite_color",
+        "when is my birthday": "birthday",
+        "how old am i": "age",
+        # Add more Q&A mappings as needed
+    }
+    for question, key in key_map.items():
+        if question in user_message.lower():
+            fact = MemoryFact.objects.filter(chat_session=chat_session, key=key).first()
+            if fact:
+                return f"Your {key.replace('_', ' ')} is {fact.value}."
+            else:
+                return f"I don't know your {key.replace('_', ' ')} yet."
+    return None
 
 def follow_up_handler(session, required_fields, user_input, extract_func, action_func, creds):
     data = session.get('pending_data', {}) or {}

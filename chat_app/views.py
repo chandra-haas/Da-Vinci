@@ -20,7 +20,14 @@ from .google_services import (
     MissingCredentials,
 )
 
-from .assistant_utils import follow_up_handler, gpt_param_extractor
+from .assistant_utils import (
+    follow_up_handler,
+    gpt_param_extractor,
+    extract_facts,
+    save_facts,
+    recall_fact,
+)
+from .models import ChatSession, Message  # memory models
 
 import openai
 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -75,6 +82,14 @@ GOOGLE_ACTIONS = {
     },
 }
 
+def get_or_create_chat_session(request):
+    session_id = request.session.session_key
+    if not session_id:
+        request.session.create()
+        session_id = request.session.session_key
+    chat_session, _ = ChatSession.objects.get_or_create(session_id=session_id)
+    return chat_session
+
 @csrf_exempt
 def chat_api(request):
     print("[DEBUG] --- chat_api endpoint hit ---")
@@ -85,6 +100,26 @@ def chat_api(request):
         data = json.loads(request.body)
         user_message = data.get('message', '').strip()
         print(f"[DEBUG] user_message: {user_message}")
+
+        # --- MEMORY FEATURE: Save user message ---
+        chat_session = get_or_create_chat_session(request)
+        Message.objects.create(
+            chat_session=chat_session,
+            sender='user',
+            content=user_message
+        )
+
+        # --- SEMANTIC MEMORY: Fact extraction and recall ---
+        # Save any facts from this message
+        facts = extract_facts(user_message)
+        if facts:
+            save_facts(chat_session, facts)
+
+        # Respond to fact-based questions before anything else
+        fact_response = recall_fact(chat_session, user_message)
+        if fact_response:
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=fact_response)
+            return JsonResponse({'response': fact_response})
 
         # Check for ongoing follow-up for any Google service
         pending_intent = request.session.get('pending_intent')
@@ -100,6 +135,7 @@ def chat_api(request):
                 action_func=action_spec["fn"],
                 creds=creds
             )
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=reply)
             return JsonResponse({'response': reply})
 
         # Classify intent as usual
@@ -108,28 +144,44 @@ def chat_api(request):
         now = datetime.now()
 
         if intent == "date":
-            return JsonResponse({'response': f"Today's date is {now.strftime('%B %d, %Y')}"})
+            bot_response = f"Today's date is {now.strftime('%B %d, %Y')}"
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+            return JsonResponse({'response': bot_response})
         elif intent == "time":
-            return JsonResponse({'response': f"The current time is {now.strftime('%I:%M %p')}"})
+            bot_response = f"The current time is {now.strftime('%I:%M %p')}"
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+            return JsonResponse({'response': bot_response})
         elif intent == "day":
-            return JsonResponse({'response': f"Today is {now.strftime('%A')}"})
+            bot_response = f"Today is {now.strftime('%A')}"
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+            return JsonResponse({'response': bot_response})
 
         if intent == "web_search":
             search_results = brave_web_search(user_message)
             if not search_results:
-                return JsonResponse({'response': 'Sorry, no relevant web results found.'})
+                bot_response = 'Sorry, no relevant web results found.'
+                Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+                return JsonResponse({'response': bot_response})
             context = format_search_results_for_gpt(search_results)
+            # Add chat history for context if desired
+            history = Message.objects.filter(chat_session=chat_session).order_by('timestamp')
+            history_text = "\n".join(f"{msg.sender}: {msg.content}" for msg in history)
             gpt_prompt = (
                 f"Answer the following user query based on these web results:\n"
-                f"User query: {user_message}\n\nWeb results:\n{context}"
+                f"User query: {user_message}\n\nWeb results:\n{context}\n\nChat history:\n{history_text}"
             )
             response = client.chat.completions.create(
                 model="gpt-4.1-mini",
-                messages=[{"role": "user", "content": gpt_prompt}],
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that remembers the conversation."},
+                    {"role": "user", "content": gpt_prompt}
+                ],
                 max_tokens=500,
                 temperature=0.7,
             )
-            return JsonResponse({'response': response.choices[0].message.content.strip()})
+            bot_response = response.choices[0].message.content.strip()
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+            return JsonResponse({'response': bot_response})
 
         if intent in GOOGLE_ACTIONS:
             service_action = GOOGLE_ACTIONS[intent]
@@ -137,8 +189,10 @@ def chat_api(request):
             try:
                 creds = get_user_credentials(request.session)
             except MissingCredentials:
+                bot_response = 'Authorization required. Please log in with Google.'
+                Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
                 return JsonResponse(
-                    {'response': 'Authorization required. Please log in with Google.', 'auth_required': True},
+                    {'response': bot_response, 'auth_required': True},
                     status=401
                 )
             request.session['pending_intent'] = intent
@@ -147,19 +201,33 @@ def chat_api(request):
             if service_action["params"]:
                 first_param = service_action["params"][0]
                 prompt = f"What is the {first_param.replace('_', ' ')}?"
+                Message.objects.create(chat_session=chat_session, sender='assistant', content=prompt)
                 return JsonResponse({'response': prompt})
             else:
                 # No params needed: execute directly
                 result = service_action["fn"](creds)
+                Message.objects.create(chat_session=chat_session, sender='assistant', content=result)
                 return JsonResponse({'response': result})
 
+        # --- DEFAULT: Chat with LLM using chat history as context ---
+        # Add chat history for context
+        history = Message.objects.filter(chat_session=chat_session).order_by('timestamp')
+        history_text = "\n".join(f"{msg.sender}: {msg.content}" for msg in history)
+        gpt_prompt = (
+            f"User message: {user_message}\n\nChat history:\n{history_text}"
+        )
         response = client.chat.completions.create(
             model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": user_message}],
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that remembers and uses the conversation history for context."},
+                {"role": "user", "content": gpt_prompt}
+            ],
             max_tokens=500,
             temperature=0.7,
         )
-        return JsonResponse({'response': response.choices[0].message.content.strip()})
+        bot_response = response.choices[0].message.content.strip()
+        Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+        return JsonResponse({'response': bot_response})
 
     except Exception as e:
         print(f"[DEBUG] Exception occurred: {e}")
