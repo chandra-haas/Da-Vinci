@@ -90,6 +90,29 @@ def get_or_create_chat_session(request):
     chat_session, _ = ChatSession.objects.get_or_create(session_id=session_id)
     return chat_session
 
+def is_direct_date_or_time_question(message):
+    msg = message.strip().lower()
+    # Direct questions that should yield date/time
+    date_triggers = {
+        "what is the date", "what's the date", "today's date", "date?",
+        "what date is it", "current date", "give me the date", "show date"
+    }
+    time_triggers = {
+        "what is the time", "what's the time", "current time", "time?",
+        "what time is it", "give me the time", "show time"
+    }
+    day_triggers = {
+        "what day is it", "which day is it", "today's day", "day?", "day"
+    }
+    # Remove punctuation for robustness
+    import re
+    msg_no_punct = re.sub(r'[^\w\s]', '', msg)
+    return (
+        msg in date_triggers or msg_no_punct in date_triggers,
+        msg in time_triggers or msg_no_punct in time_triggers,
+        msg in day_triggers or msg_no_punct in day_triggers
+    )
+
 @csrf_exempt
 def chat_api(request):
     print("[DEBUG] --- chat_api endpoint hit ---")
@@ -143,18 +166,21 @@ def chat_api(request):
         print(f"[DEBUG] Detected intent: {intent}")
         now = datetime.now()
 
-        if intent == "date":
+        # --- IMPROVED: Only answer with date/time/day for direct questions ---
+        is_date_q, is_time_q, is_day_q = is_direct_date_or_time_question(user_message)
+        if (intent == "date" and is_date_q):
             bot_response = f"Today's date is {now.strftime('%B %d, %Y')}"
             Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
             return JsonResponse({'response': bot_response})
-        elif intent == "time":
+        elif (intent == "time" and is_time_q):
             bot_response = f"The current time is {now.strftime('%I:%M %p')}"
             Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
             return JsonResponse({'response': bot_response})
-        elif intent == "day":
+        elif (intent == "day" and is_day_q):
             bot_response = f"Today is {now.strftime('%A')}"
             Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
             return JsonResponse({'response': bot_response})
+        # --- For all other 'when...' or time-related questions, let the LLM answer! ---
 
         if intent == "web_search":
             search_results = brave_web_search(user_message)

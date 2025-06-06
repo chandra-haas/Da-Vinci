@@ -18,7 +18,12 @@ ALLOWED_INTENTS = {
 
 def classify_intent(message):
     print(f"[DEBUG] [intent_classifier] Input message: {message}")
-    
+
+    # FALLBACK: Recognize mail/email/gmail for send intent
+    lowered = message.lower()
+    if any(w in lowered for w in ["send mail", "send an email", "send email", "mail to", "email to"]) and "outlook" not in lowered:
+        return "gmail.compose"
+
     check_message = [
         {
             "role": "system",
