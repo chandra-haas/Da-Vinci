@@ -1,5 +1,10 @@
 import json
+<<<<<<< HEAD
 from django.utils import timezone
+=======
+from datetime import datetime
+
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -26,11 +31,16 @@ from .assistant_utils import (
     save_facts,
     recall_fact,
 )
+<<<<<<< HEAD
 from .models import MainMemory, ChatSession, SubMemory, SessionMemory, CacheMemory, Message
+=======
+from .models import ChatSession, Message  # memory models
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 
 import openai
 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
 
+<<<<<<< HEAD
 def sanitize_markdown(text):
     import re
     text = re.sub(r"```[\s\S]*?```", "", text)
@@ -59,24 +69,36 @@ def get_or_create_chat_session(request):
         SessionMemory.objects.create(chat_session=chat_session)
         CacheMemory.objects.create(chat_session=chat_session)
     return chat_session
+=======
+# Format helpers
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 
 def format_task_list(creds):
     tasks = get_all_tasks(creds)
     if not tasks:
         return "✅ You have no tasks at the moment."
+<<<<<<< HEAD
     lines = [f"- **{task['title']}**" for task in tasks if 'title' in task]
+=======
+    lines = [f"- {task['title']}" for task in tasks if 'title' in task]
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
     return "📝 Here are your tasks:\n" + "\n".join(lines)
 
 def format_gmail_list(creds):
     messages = get_gmail_messages(creds).get('messages', [])
     if not messages:
         return "📭 No recent emails found."
+<<<<<<< HEAD
     return f"📨 You have **{len(messages)}** recent email(s)."
+=======
+    return f"📨 You have {len(messages)} recent email(s)."
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 
 def format_drive_files(creds):
     files = get_drive_files(creds).get('files', [])
     if not files:
         return "📁 Your Drive has no recent files."
+<<<<<<< HEAD
     file_lines = [f"- **{file['name']}**" for file in files if 'name' in file]
     return "📂 Here are your recent files:\n" + "\n".join(file_lines)
 
@@ -94,6 +116,12 @@ def is_valid_email_param(value, param_type):
         return False
     return True
 
+=======
+    file_lines = [f"- {file['name']}" for file in files if 'name' in file]
+    return "📂 Here are your recent files:\n" + "\n".join(file_lines)
+
+# Mapping service+action to the corresponding function and required params
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 GOOGLE_ACTIONS = {
     "gmail.compose": {
         "fn": send_gmail_message,
@@ -121,8 +149,22 @@ GOOGLE_ACTIONS = {
     },
 }
 
+<<<<<<< HEAD
 def is_direct_date_or_time_question(message):
     msg = message.strip().lower()
+=======
+def get_or_create_chat_session(request):
+    session_id = request.session.session_key
+    if not session_id:
+        request.session.create()
+        session_id = request.session.session_key
+    chat_session, _ = ChatSession.objects.get_or_create(session_id=session_id)
+    return chat_session
+
+def is_direct_date_or_time_question(message):
+    msg = message.strip().lower()
+    # Direct questions that should yield date/time
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
     date_triggers = {
         "what is the date", "what's the date", "today's date", "date?",
         "what date is it", "current date", "give me the date", "show date"
@@ -134,6 +176,10 @@ def is_direct_date_or_time_question(message):
     day_triggers = {
         "what day is it", "which day is it", "today's day", "day?", "day"
     }
+<<<<<<< HEAD
+=======
+    # Remove punctuation for robustness
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
     import re
     msg_no_punct = re.sub(r'[^\w\s]', '', msg)
     return (
@@ -153,6 +199,10 @@ def chat_api(request):
         user_message = data.get('message', '').strip()
         print(f"[DEBUG] user_message: {user_message}")
 
+<<<<<<< HEAD
+=======
+        # --- MEMORY FEATURE: Save user message ---
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
         chat_session = get_or_create_chat_session(request)
         Message.objects.create(
             chat_session=chat_session,
@@ -160,10 +210,16 @@ def chat_api(request):
             content=user_message
         )
 
+<<<<<<< HEAD
+=======
+        # --- SEMANTIC MEMORY: Fact extraction and recall ---
+        # Save any facts from this message
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
         facts = extract_facts(user_message)
         if facts:
             save_facts(chat_session, facts)
 
+<<<<<<< HEAD
         fact_response = recall_fact(chat_session, user_message)
         if fact_response:
             fact_response = sanitize_markdown(fact_response)
@@ -237,15 +293,67 @@ def chat_api(request):
             bot_response = sanitize_markdown(bot_response)
             Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
             return JsonResponse({'response': bot_response})
+=======
+        # Respond to fact-based questions before anything else
+        fact_response = recall_fact(chat_session, user_message)
+        if fact_response:
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=fact_response)
+            return JsonResponse({'response': fact_response})
+
+        # Check for ongoing follow-up for any Google service
+        pending_intent = request.session.get('pending_intent')
+        pending_data = request.session.get('pending_data', {})
+        if pending_intent and pending_intent in GOOGLE_ACTIONS:
+            creds = get_user_credentials(request.session)
+            action_spec = GOOGLE_ACTIONS[pending_intent]
+            reply = follow_up_handler(
+                session=request.session,
+                required_fields=action_spec["params"],
+                user_input=user_message,
+                extract_func=gpt_param_extractor,
+                action_func=action_spec["fn"],
+                creds=creds
+            )
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=reply)
+            return JsonResponse({'response': reply})
+
+        # Classify intent as usual
+        intent = classify_intent(user_message)
+        print(f"[DEBUG] Detected intent: {intent}")
+        now = datetime.now()
+
+        # --- IMPROVED: Only answer with date/time/day for direct questions ---
+        is_date_q, is_time_q, is_day_q = is_direct_date_or_time_question(user_message)
+        if (intent == "date" and is_date_q):
+            bot_response = f"Today's date is {now.strftime('%B %d, %Y')}"
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+            return JsonResponse({'response': bot_response})
+        elif (intent == "time" and is_time_q):
+            bot_response = f"The current time is {now.strftime('%I:%M %p')}"
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+            return JsonResponse({'response': bot_response})
+        elif (intent == "day" and is_day_q):
+            bot_response = f"Today is {now.strftime('%A')}"
+            Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+            return JsonResponse({'response': bot_response})
+        # --- For all other 'when...' or time-related questions, let the LLM answer! ---
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 
         if intent == "web_search":
             search_results = brave_web_search(user_message)
             if not search_results:
                 bot_response = 'Sorry, no relevant web results found.'
+<<<<<<< HEAD
                 bot_response = sanitize_markdown(bot_response)
                 Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
                 return JsonResponse({'response': bot_response})
             context = format_search_results_for_gpt(search_results)
+=======
+                Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
+                return JsonResponse({'response': bot_response})
+            context = format_search_results_for_gpt(search_results)
+            # Add chat history for context if desired
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
             history = Message.objects.filter(chat_session=chat_session).order_by('timestamp')
             history_text = "\n".join(f"{msg.sender}: {msg.content}" for msg in history)
             gpt_prompt = (
@@ -262,7 +370,10 @@ def chat_api(request):
                 temperature=0.7,
             )
             bot_response = response.choices[0].message.content.strip()
+<<<<<<< HEAD
             bot_response = sanitize_markdown(bot_response)
+=======
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
             Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
             return JsonResponse({'response': bot_response})
 
@@ -273,12 +384,16 @@ def chat_api(request):
                 creds = get_user_credentials(request.session)
             except MissingCredentials:
                 bot_response = 'Authorization required. Please log in with Google.'
+<<<<<<< HEAD
                 bot_response = sanitize_markdown(bot_response)
+=======
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
                 Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
                 return JsonResponse(
                     {'response': bot_response, 'auth_required': True},
                     status=401
                 )
+<<<<<<< HEAD
             # Always clear any old data at the start of a new intent!
             chat_session.pending_intent = intent
             chat_session.pending_data = {}
@@ -323,6 +438,24 @@ def chat_api(request):
                 Message.objects.create(chat_session=chat_session, sender='assistant', content=result)
                 return JsonResponse({'response': result})
 
+=======
+            request.session['pending_intent'] = intent
+            request.session['pending_data'] = {}
+            request.session.modified = True
+            if service_action["params"]:
+                first_param = service_action["params"][0]
+                prompt = f"What is the {first_param.replace('_', ' ')}?"
+                Message.objects.create(chat_session=chat_session, sender='assistant', content=prompt)
+                return JsonResponse({'response': prompt})
+            else:
+                # No params needed: execute directly
+                result = service_action["fn"](creds)
+                Message.objects.create(chat_session=chat_session, sender='assistant', content=result)
+                return JsonResponse({'response': result})
+
+        # --- DEFAULT: Chat with LLM using chat history as context ---
+        # Add chat history for context
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
         history = Message.objects.filter(chat_session=chat_session).order_by('timestamp')
         history_text = "\n".join(f"{msg.sender}: {msg.content}" for msg in history)
         gpt_prompt = (
@@ -338,11 +471,15 @@ def chat_api(request):
             temperature=0.7,
         )
         bot_response = response.choices[0].message.content.strip()
+<<<<<<< HEAD
         bot_response = sanitize_markdown(bot_response)
+=======
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
         Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
         return JsonResponse({'response': bot_response})
 
     except Exception as e:
+<<<<<<< HEAD
         chat_session = None
         try:
             chat_session = get_or_create_chat_session(request)
@@ -356,6 +493,10 @@ def chat_api(request):
         bot_response = f"Error: {str(e)}"
         bot_response = sanitize_markdown(bot_response)
         return JsonResponse({'response': bot_response}, status=500)
+=======
+        print(f"[DEBUG] Exception occurred: {e}")
+        return JsonResponse({'response': f"Error: {str(e)}"}, status=500)
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 
 def chat_view(request):
     return render(request, 'chat_window.html')

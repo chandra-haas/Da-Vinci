@@ -1,7 +1,14 @@
 import re
+<<<<<<< HEAD
 import dateparser
 
 from .models import SubMemory, SessionMemory, CacheMemory, ChatSession
+=======
+from datetime import datetime
+import dateparser
+
+from .models import MemoryFact, ChatSession  # Import MemoryFact for semantic memory
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 
 def gpt_param_extractor(user_input, required_fields):
     extracted = {}
@@ -76,6 +83,7 @@ def extract_facts(user_message):
 
 def save_facts(chat_session, facts):
     """
+<<<<<<< HEAD
     Save extracted facts to the SessionMemory model, updating if the key exists.
     """
     session_memory = SessionMemory.objects.get(chat_session=chat_session)
@@ -88,6 +96,21 @@ def recall_fact(chat_session, user_message):
     Check if the user is asking about a stored fact and retrieve it from session memory.
     """
     session_memory = SessionMemory.objects.get(chat_session=chat_session)
+=======
+    Save extracted facts to the MemoryFact model, updating if the key exists.
+    """
+    for key, value in facts:
+        MemoryFact.objects.update_or_create(
+            chat_session=chat_session,
+            key=key,
+            defaults={'value': value}
+        )
+
+def recall_fact(chat_session, user_message):
+    """
+    Check if the user is asking about a stored fact and retrieve it from memory.
+    """
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
     key_map = {
         "what is my name": "name",
         "who am i": "name",
@@ -100,13 +123,20 @@ def recall_fact(chat_session, user_message):
     }
     for question, key in key_map.items():
         if question in user_message.lower():
+<<<<<<< HEAD
             value = session_memory.facts.get(key)
             if value:
                 return f"Your {key.replace('_', ' ')} is {value}."
+=======
+            fact = MemoryFact.objects.filter(chat_session=chat_session, key=key).first()
+            if fact:
+                return f"Your {key.replace('_', ' ')} is {fact.value}."
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
             else:
                 return f"I don't know your {key.replace('_', ' ')} yet."
     return None
 
+<<<<<<< HEAD
 def save_preferences(chat_session, preferences):
     """
     Save user preferences to SubMemory.
@@ -129,6 +159,8 @@ def get_cache(chat_session):
     cache_memory = CacheMemory.objects.get(chat_session=chat_session)
     return cache_memory.cache
 
+=======
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
 def follow_up_handler(session, required_fields, user_input, extract_func, action_func, creds):
     data = session.get('pending_data', {}) or {}
     missing_fields = [f for f in required_fields if not data.get(f)]
@@ -139,10 +171,14 @@ def follow_up_handler(session, required_fields, user_input, extract_func, action
 
         FIELD_ALIASES = {
             "to": "to_email", "recipient": "to_email",
+<<<<<<< HEAD
             "title": "subject",  # FIXED for email subject
             "subject": "subject",
             "body": "body",
             "name": "summary"
+=======
+            "title": "task_title", "name": "summary"
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
         }
 
         for real_field in missing_fields:
@@ -162,7 +198,11 @@ def follow_up_handler(session, required_fields, user_input, extract_func, action
         next_field = still_missing[0]
         prompts = {
             "to_email": "Who should I send it to? (Please provide an email address)",
+<<<<<<< HEAD
             "subject": "What is the subject of the email?",
+=======
+            "subject": "What is the subject?",
+>>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
             "body": "What should the body/message say?",
             "task_title": "What is the task title?",
             "task_notes": "Any notes for the task?",
