@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from django.contrib import admin
 from .models import MainMemory, ChatSession, SubMemory, SessionMemory, CacheMemory, Message
 
@@ -33,6 +32,3 @@ class MessageAdmin(admin.ModelAdmin):
     list_display = ('id', 'chat_session', 'sender', 'timestamp')
     search_fields = ('chat_session__session_name', 'sender', 'content')
     list_filter = ('sender', 'timestamp')
-=======
-from django.contrib import admin
->>>>>>> c88ac103dbcd299eccaf81ac54a241438167ebfc
