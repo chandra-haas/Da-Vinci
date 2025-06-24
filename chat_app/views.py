@@ -31,20 +31,17 @@ from .models import MainMemory, ChatSession, SubMemory, SessionMemory, CacheMemo
 import openai
 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
 
-
 def sanitize_markdown(text):
     import re
     text = re.sub(r"```[\s\S]*?```", "", text)
     text = re.sub(r"`([^`]*)`", r"\1", text)
     return text
 
-
 def get_or_create_main_memory(request):
     main_memory, _ = MainMemory.objects.get_or_create(
         user=request.user if hasattr(request, "user") and request.user.is_authenticated else None
     )
     return main_memory
-
 
 def get_or_create_chat_session(request):
     main_memory = get_or_create_main_memory(request)
@@ -62,7 +59,6 @@ def get_or_create_chat_session(request):
         CacheMemory.objects.create(chat_session=chat_session)
     return chat_session
 
-
 def format_task_list(creds):
     tasks = get_all_tasks(creds)
     if not tasks:
@@ -70,13 +66,11 @@ def format_task_list(creds):
     lines = [f"- **{task['title']}**" for task in tasks if 'title' in task]
     return "📝 Here are your tasks:\n" + "\n".join(lines)
 
-
 def format_gmail_list(creds):
     messages = get_gmail_messages(creds).get('messages', [])
     if not messages:
         return "📭 No recent emails found."
     return f"📨 You have **{len(messages)}** recent email(s)."
-
 
 def format_drive_files(creds):
     files = get_drive_files(creds).get('files', [])
@@ -84,7 +78,6 @@ def format_drive_files(creds):
         return "📁 Your Drive has no recent files."
     file_lines = [f"- **{file['name']}**" for file in files if 'name' in file]
     return "📂 Here are your recent files:\n" + "\n".join(file_lines)
-
 
 def is_valid_email_param(value, param_type):
     if not value:
@@ -99,7 +92,6 @@ def is_valid_email_param(value, param_type):
     if param_type == "to_email" and ("@" not in value or "." not in value):
         return False
     return True
-
 
 GOOGLE_ACTIONS = {
     "gmail.compose": {
@@ -282,7 +274,6 @@ def chat_api(request):
                 if not is_valid_email_param(initial_extracted.get(p), p):
                     initial_extracted.pop(p, None)
                     missing.append(p)
-
             if not missing:
                 try:
                     result = service_action["fn"](creds, **{k: initial_extracted[k] for k in params_needed})
@@ -297,7 +288,6 @@ def chat_api(request):
                 chat_session.pending_data = {}
                 chat_session.save()
                 return JsonResponse({'response': bot_response})
-
             elif params_needed:
                 first_missing = missing[0]
                 prompt_map = {
@@ -311,7 +301,6 @@ def chat_api(request):
                 chat_session.save()
                 Message.objects.create(chat_session=chat_session, sender='assistant', content=prompt)
                 return JsonResponse({'response': prompt})
-
             else:
                 result = service_action["fn"](creds)
                 result = sanitize_markdown(result)
