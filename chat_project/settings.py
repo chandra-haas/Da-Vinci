@@ -58,7 +58,7 @@ ROOT_URLCONF = 'chat_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ['C:/Users/chand/OneDrive/Desktop/Da-Vinci/chat_project/templates'],
+        'DIRS': ['C:/Users/Akshith Reddy/Documents/PlatformIO/Projects/Da-Vinci/templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
