@@ -1,0 +1,62 @@
+[
+  {
+    "text": "what is todays date",
+    "intent": "date"
+  },
+  {
+    "text": "what is todays date man",
+    "intent": "date"
+  },
+  {
+    "text": "note this down",
+    "intent": "notepad.open"
+  },
+  {
+    "text": "upload this to drive",
+    "intent": "google_drive.upload"
+  },
+  {
+    "text": "what is todays date",
+    "intent": "date"
+  },
+  {
+    "text": "date ??",
+    "intent": "date"
+  },
+  {
+    "text": "what's the clock showing now man",
+    "intent": "time"
+  },
+  {
+    "text": "latest mails ??",
+    "intent": "gmail.read"
+  },
+  {
+    "text": "latest mails ??",
+    "intent": "gmail.read"
+  },
+  {
+    "text": "send a mail",
+    "intent": "gmail.compose"
+  },
+  {
+    "text": "you nigga what does the calendar say",
+    "intent": "date"
+  },
+  {
+    "text": "what does the clock say homie",
+    "intent": "time"
+  },
+  {
+    "text": "send the time to me man",
+    "intent": "time"
+  },
+  {
+    "text": "time please",
+    "intent": "time"
+  },
+  {
+    "text": "give me the date and time",
+    "intent": "date"
+  }
+]
