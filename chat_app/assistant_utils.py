@@ -1,8 +1,7 @@
 import re
-
 import dateparser
 
-from .models import SubMemory, SessionMemory, CacheMemory, ChatSession
+from .models import MemoryFact, ChatSession  # Import MemoryFact for semantic memory
 
 def gpt_param_extractor(user_input, required_fields):
     extracted = {}
@@ -77,21 +76,22 @@ def extract_facts(user_message):
 
 def save_facts(chat_session, facts):
     """
-    Save extracted facts to the SessionMemory model, updating if the key exists.
+    Save extracted facts to the MemoryFact model, updating if the key exists.
     """
-    session_memory = SessionMemory.objects.get(chat_session=chat_session)
     for key, value in facts:
-        session_memory.facts[key] = value
-    session_memory.save()
+        MemoryFact.objects.update_or_create(
+            chat_session=chat_session,
+            key=key,
+            defaults={'value': value}
+        )
 
 
 
 
 def recall_fact(chat_session, user_message):
     """
-    Check if the user is asking about a stored fact and retrieve it from session memory.
+    Check if the user is asking about a stored fact and retrieve it from memory.
     """
-    session_memory = SessionMemory.objects.get(chat_session=chat_session)
     key_map = {
         "what is my name": "name",
         "who am i": "name",
@@ -104,34 +104,12 @@ def recall_fact(chat_session, user_message):
     }
     for question, key in key_map.items():
         if question in user_message.lower():
-            value = session_memory.facts.get(key)
-            if value:
-                return f"Your {key.replace('_', ' ')} is {value}."
+            fact = MemoryFact.objects.filter(chat_session=chat_session, key=key).first()
+            if fact:
+                return f"Your {key.replace('_', ' ')} is {fact.value}."
             else:
                 return f"I don't know your {key.replace('_', ' ')} yet."
     return None
-
-def save_preferences(chat_session, preferences):
-    """
-    Save user preferences to SubMemory.
-    """
-    sub_memory = SubMemory.objects.get(chat_session=chat_session)
-    for key, value in preferences.items():
-        sub_memory.preferences[key] = value
-    sub_memory.save()
-
-def get_preferences(chat_session):
-    sub_memory = SubMemory.objects.get(chat_session=chat_session)
-    return sub_memory.preferences
-
-def save_cache(chat_session, cache_data):
-    cache_memory = CacheMemory.objects.get(chat_session=chat_session)
-    cache_memory.cache = cache_data
-    cache_memory.save()
-
-def get_cache(chat_session):
-    cache_memory = CacheMemory.objects.get(chat_session=chat_session)
-    return cache_memory.cache
 
 def follow_up_handler(session, required_fields, user_input, extract_func, action_func, creds):
     data = session.get('pending_data', {}) or {}
@@ -143,10 +121,7 @@ def follow_up_handler(session, required_fields, user_input, extract_func, action
 
         FIELD_ALIASES = {
             "to": "to_email", "recipient": "to_email",
-            "title": "subject",  # FIXED for email subject
-            "subject": "subject",
-            "body": "body",
-            "name": "summary"
+            "title": "task_title", "name": "summary"
         }
 
         for real_field in missing_fields:
@@ -166,7 +141,7 @@ def follow_up_handler(session, required_fields, user_input, extract_func, action
         next_field = still_missing[0]
         prompts = {
             "to_email": "Who should I send it to? (Please provide an email address)",
-            "subject": "What is the subject of the email?",
+            "subject": "What is the subject?",
             "body": "What should the body/message say?",
             "task_title": "What is the task title?",
             "task_notes": "Any notes for the task?",
