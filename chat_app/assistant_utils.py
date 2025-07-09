@@ -1,4 +1,5 @@
 import re
+
 import dateparser
 
 from .models import SubMemory, SessionMemory, CacheMemory, ChatSession
@@ -82,6 +83,9 @@ def save_facts(chat_session, facts):
     for key, value in facts:
         session_memory.facts[key] = value
     session_memory.save()
+
+
+
 
 def recall_fact(chat_session, user_message):
     """

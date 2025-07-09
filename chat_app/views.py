@@ -19,6 +19,7 @@ from .google_services import (
     get_user_credentials,
     MissingCredentials,
 )
+
 from .assistant_utils import (
     follow_up_handler,
     gpt_param_extractor,
@@ -121,6 +122,13 @@ GOOGLE_ACTIONS = {
 }
 
 
+
+
+
+
+
+
+
 @csrf_exempt
 def chat_api(request):
     print("[DEBUG] --- chat_api endpoint hit ---")
@@ -132,6 +140,7 @@ def chat_api(request):
         user_message = data.get('message', '').strip()
         print(f"[DEBUG] user_message: {user_message}")
 
+
         chat_session = get_or_create_chat_session(request)
         Message.objects.create(
             chat_session=chat_session,
@@ -140,9 +149,11 @@ def chat_api(request):
         )
 
         # Fact extraction and recall
+
         facts = extract_facts(user_message)
         if facts:
             save_facts(chat_session, facts)
+
 
         fact_response = recall_fact(chat_session, user_message)
         if fact_response:
@@ -201,6 +212,7 @@ def chat_api(request):
         intent = classify_intent(user_message)
         print(f"[DEBUG] Detected intent: {intent}")
 
+
         now_local = localtime(timezone.now())
 
         # Handle date/time/day intents with local timezone
@@ -229,6 +241,7 @@ def chat_api(request):
                 Message.objects.create(chat_session=chat_session, sender='assistant', content=bot_response)
                 return JsonResponse({'response': bot_response})
             context = format_search_results_for_gpt(search_results)
+
             history = Message.objects.filter(chat_session=chat_session).order_by('timestamp')
             history_text = "\n".join(f"{msg.sender}: {msg.content}" for msg in history)
             gpt_prompt = (
@@ -252,6 +265,7 @@ def chat_api(request):
         # Handle Google actions intents
         if intent in GOOGLE_ACTIONS:
             service_action = GOOGLE_ACTIONS[intent]
+
             try:
                 creds = get_user_credentials(request.session)
             except MissingCredentials:
@@ -302,12 +316,14 @@ def chat_api(request):
                 Message.objects.create(chat_session=chat_session, sender='assistant', content=prompt)
                 return JsonResponse({'response': prompt})
             else:
+
                 result = service_action["fn"](creds)
                 result = sanitize_markdown(result)
                 Message.objects.create(chat_session=chat_session, sender='assistant', content=result)
                 return JsonResponse({'response': result})
 
         # Fallback: Use GPT chat completion with history
+
         history = Message.objects.filter(chat_session=chat_session).order_by('timestamp')
         history_text = "\n".join(f"{msg.sender}: {msg.content}" for msg in history)
         gpt_prompt = (
